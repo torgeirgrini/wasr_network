@@ -1,8 +1,8 @@
 """
-Training script for semantic image segmentation using WASR model without IMU functionality.
+Training script for semantic image segmentation using WASR model with IMU functionality.
 
-This script train on MaSTr1325 marine dataset which contains 1325 images
-This images should be further pre-augmented using: classical augmentation (rotation, scale, mirroring)
+This script trains on MaSTr1325 marine dataset which contains 1325 images
+The  images should be further pre-augmented using: classical augmentation (rotation, scale, mirroring)
                                                    color augmentation
                                                    water component elastic deformation (to simulate differnt kinds of wavelets)
 """
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 from tensorflow.python import pywrap_tensorflow
 from tensorflow.python.ops import array_ops
 
-from wasr_models import wasr_NOIMU2, ImageReader, decode_labels, inv_preprocess, prepare_label
+from wasr_models import wasr_IMU_FU2, ImageReader, decode_labels, inv_preprocess, prepare_label
 
 # COLOR MEANS OF IMAGES FROM MODDv1 DATASET
 IMG_MEAN = np.array((148.8430, 171.0260, 162.4082), dtype=np.float32)
@@ -29,10 +29,12 @@ IMG_MEAN = np.array((148.8430, 171.0260, 162.4082), dtype=np.float32)
 BATCH_SIZE = 2 #5
 # Full path to the folder where images are located
 DATA_DIRECTORY = '/opt/workspace/host_storage_hdd/boat/train_images_mastr_all/'
+
 # Full path to txt file. The txt file should contain image, gt mask and imu mask in each line
 # example: frames/image_name.jpg masks/image_name.png imus/image_name.png
 # (lines in txt file should be pre-shuffled, since we do not perform shuffling while training)
 DATA_LIST_PATH = '/opt/workspace/host_storage_hdd/boat/train_images_mastr_all/train_water_deformed.txt'
+
 
 GRAD_UPDATE_EVERY = 10
 
@@ -59,7 +61,7 @@ SAVE_NUM_IMAGES = 1
 # When to save checkpoint while training
 SAVE_PRED_EVERY = 100
 # Location where checkpoints are saved
-SNAPSHOT_DIR = '/opt/workspace/host_storage_hdd/boat/weights_models/snapshots_wasr_noimu/'
+SNAPSHOT_DIR = '/opt/workspace/host_storage_hdd/boat/weights_models/snapshots_wasr_imu_fu2/'
 
 WEIGHT_DECAY = 1e-6
 
@@ -304,11 +306,11 @@ def main():
             args.ignore_label,
             IMG_MEAN,
             coord)
-        image_batch, label_batch, _ = reader.dequeue(args.batch_size)  # 1st = images, 2nd = gt labels, 3rd = imu (we do not need IMU here)
+        image_batch, label_batch, imu_batch = reader.dequeue(args.batch_size)  # 1st = images, 2nd = gt labels, 3rd = imu (we do not need IMU here)
 
     # Create network.
     with tf.variable_scope('', reuse=False):
-        net = wasr_NOIMU2({'data': image_batch}, is_training=args.is_training, num_classes=args.num_classes)
+        net = wasr_IMU_FU2({'data': image_batch, 'imu_data': imu_batch}, is_training=args.is_training, num_classes=args.num_classes)
 
     # For a small batch size, it is better to keep
     # the statistics of the BN layers (running means and variances)
@@ -362,11 +364,11 @@ def main():
 
     # Features loss from somewhere in the middle. This forces the network to separate water pixels from obstacles
     loss_0 = cost_function_separate_water_obstacle(inthemiddle_output, label_batch)
-    #loss_0 = tf.Print(loss_0, [loss_0], 'Water separation loss ')
+    loss_0 = tf.Print(loss_0, [loss_0], 'Water separation loss ')
 
     # Pixel-wise softmax cross entropy loss (This is the tensorflow implementation)
-    ce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt))
-    ce_loss = tf.Print(ce_loss, [ce_loss], 'Default TF crossentropy loss ')
+    #ce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt))
+    #ce_loss = tf.Print(ce_loss, [ce_loss], 'Default TF crossentropy loss ')
 
     # Weight decay losses (l2 regularization)
     l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
