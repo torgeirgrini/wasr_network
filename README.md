@@ -1,12 +1,14 @@
 # WaSR -- A Water Segmentation and Refinement Maritime Obstacle Detection Network
 https://arxiv.org/abs/2001.01921 (ICRA 2020)<br>
-https://ieeexplore.ieee.org/document/9477208 (IEEE TCYB 2021 - extended)
+https://youtube.com/watch?v=K78NZbtKYVM (ICRA 2020 Video Presentation)<br>
+https://ieeexplore.ieee.org/document/9477208 (IEEE TCYB 2021 - WaSR2 extension)
 
 Obstacle detection using semantic segmentation has become an established approach in autonomous vehicles. However, existing segmentation methods, primarily developed for ground vehicles, are inadequate in an aquatic environment as they produce many false positive (FP) detections in the presence of water reflections and wakes. We propose a novel deep encoder-decoder architecture, a water segmentation and refinement (WaSR) network, specifically designed for the marine environment to address these issues. A deep encoder based on ResNet101 with atrous convolutions enables the extraction of rich visual features, while a novel decoder gradually fuses them with inertial information from the inertial measurement unit (IMU). The inertial information greatly improves the segmentation accuracy of the water component in the presence of visual ambiguities, such as fog on the horizon. Furthermore, a novel loss function for semantic separation is proposed to enforce the separation of different semantic components to increase the robustness of the segmentation. We investigate different loss variants and observe a significant reduction in false positives and an increase in true positives (TP). Experimental results show that WaSR outperforms the current state-of-the-art by approximately 4% in F1-score on a challenging USV dataset. WaSR shows remarkable generalization capabilities and outperforms the state of the art by over 24% in F1 score on a strict domain generalization experiment.
 
-<img align="center" src="figures/wasr_main.jpg" width="100%">
+<a href="https://youtube.com/watch?v=K78NZbtKYVM"><img align="center" src="figures/wasr_main.jpg" width="100%"></a>
 
 Updates:
+* [July 2021] Added ICRA2020 Presentation Video
 * [June 2021] Added IMU version and pretrained weights (as seen in the TCYB paper)
 * [March 2020] <a href="https://github.com/clunietp">Thomas Clunie</a> ported WaSR to Python3 and Tensorflow 1.15.2 
 * [February 2020] Initial commit
