@@ -1,11 +1,13 @@
-# WaSR - A water-obstacle separation and refinement network for unmanned surface vehicles
+# WaSR -- A Water Segmentation and Refinement Maritime Obstacle Detection Network
 https://arxiv.org/abs/2001.01921 (ICRA 2020)
+https://ieeexplore.ieee.org/document/9477208 (IEEE TCYB 2021 - extended)
 
 <img align="right" src="figures/ICRA2020_network_model.png" width="50%" height="50%">
 
 Obstacle detection by semantic segmentation shows a great promise for autonomous navigation in unmanned surface vehicles (USV). However, existing methods suffer from poor estimation of the water edge in the presence of visual ambiguities, poor detection of small obstacles and high false-positive rate on water reflections and wakes. We propose a new deep encoder-decoder architecture, a water-obstacle separation and refinement network (WaSR), to address these issues. Detection and water edge accuracy are improved by a novel decoder that gradually fuses inertial information from IMU with the visual features from the encoder. In addition, a novel loss function is designed to increase the separation between water and obstacle features early on in the network. Subsequently, the capacity of the remaining layers in the decoder is better utilised, leading to a significant reduction in false positives and increased true positives. Experimental results show that WaSR outperforms the current state-of-the-art by a large margin, yielding a 14% increase in F-measure over the second-best method.
 
 Updates:
+* [June 2021] Added IMU version and pretrained weights (as seen in the TCYB paper)
 * [March 2020] <a href="https://github.com/clunietp">Thomas Clunie</a> ported WaSR to Python3 and Tensorflow 1.15.2 
 * [February 2020] Initial commit
 
@@ -87,7 +89,7 @@ To train the network from scratch (or from some pretrained weights) use scripts 
 
 #### Pretrained Weights
 * `WaSR NO-IMU variant` - weights are available for download <a href="https://drive.google.com/drive/folders/18SVQF-2q9wxBU1BM1ULwIW2dF9x3yVNj?usp=sharing">here</a>
-* `WaSR IMU variant` - To-Do
+* `WaSR IMU variant` - weights are available for download <a href="https://data.vicos.si/vicospages/downloads/wasr_weights/wasr_weights_imu.zip">here</a>
 
 ### Inference
 To perform the inference on a specific single image use scripts <i>wasr_inference_noimu_general.py</i> for the WaSR NO-IMU variant or <i>wasr_inference_imu_general.py</i> for the WaSR IMU variant. Both scripts expect the same input arguments and can be run on images from arbitrary maritime dataset.
@@ -128,6 +130,26 @@ To run the inference on the <a href="https://box.vicos.si/borja/viamaro/index.ht
 <p align="center">
  <img src="figures/ICRA2020_results.png">
 </p>
+
+### Cite
+Please cite our WaSR paper(s) if you use the provided code:
+```
+@inproceedings{bovcon2020water,
+  title={A water-obstacle separation and refinement network for unmanned surface vehicles},
+  author={Bovcon, Borja and Kristan, Matej},
+  booktitle={2020 IEEE International Conference on Robotics and Automation (ICRA)},
+  pages={9470--9476},
+  year={2020},
+  organization={IEEE}
+}
+```
+```
+@article{bovconwasr,
+  title={WaSR--A Water Segmentation and Refinement Maritime Obstacle Detection Network},
+  author={Bovcon, Borja and Kristan, Matej},
+  journal={IEEE transactions on cybernetics}
+}
+```
 
 ## 4. References
 [1] Bovcon et. al, The MaSTr1325 Dataset for Training Deep USV Obstacle Detection Models, IROS 2019<br>
