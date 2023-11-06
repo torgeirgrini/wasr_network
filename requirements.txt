@@ -1,0 +1,8 @@
+keras==2.10.0
+matplotlib==3.8.0
+numpy==1.26.1
+opencv_python==4.8.1.78
+Pillow==10.1.0
+protobuf==3.19.6
+scipy==1.11.3
+tf_slim==1.1.0
