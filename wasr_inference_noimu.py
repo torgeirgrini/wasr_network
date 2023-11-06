@@ -78,7 +78,7 @@ def main():
     args.save_dir = args.save_dir % (args.seq)
 
     # Create network
-    img_input = tf.placeholder(dtype=tf.uint8, shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
+    img_input = tf.compat.v1.placeholder(dtype=tf.uint8, shape=(IMG_SIZE[0], IMG_SIZE[1], 3))
 
     # Convert from opencv BGR to tensorflow's RGB format
     img_b, img_g, img_r = tf.split(axis=2, num_or_size_splits=3, value=img_input)
@@ -89,13 +89,13 @@ def main():
     img -= IMG_MEAN
 
     # Expand first dimension
-    img = tf.expand_dims(img, dim=0)
+    img = tf.expand_dims(img, axis=0)
 
-    with tf.variable_scope('', reuse=False):
+    with tf.compat.v1.variable_scope('', reuse=False):
         net = wasr_NOIMU2({'data': img}, is_training=False, num_classes=args.num_classes)
 
     # Which variables to load...
-    restore_var = tf.global_variables()
+    restore_var = tf.compat.v1.global_variables()
 
     # Predictions
     raw_output = net.layers['fc1_voc12']
@@ -103,20 +103,20 @@ def main():
     # Features at the end of the second block of convolutions...
     #middle_features = net.layers['res2c']  # net.layers['res3b3']
 
-    raw_output = tf.image.resize_bilinear(raw_output, tf.shape(img)[1:3, ])
-    raw_output = tf.argmax(raw_output, dimension=3)
-    pred = tf.expand_dims(raw_output, dim=3)
+    raw_output = tf.image.resize(raw_output, tf.shape(img)[1:3, ], method=tf.image.ResizeMethod.BILINEAR)
+    raw_output = tf.argmax(raw_output, axis=3)
+    pred = tf.expand_dims(raw_output, axis=3)
 
     # Set up TF session and initialize variables.
-    config = tf.ConfigProto()
+    config = tf.compat.v1.ConfigProto()
     config.gpu_options.allow_growth = True
-    sess = tf.Session(config=config)
-    init = tf.global_variables_initializer()
+    sess = tf.compat.v1.Session(config=config)
+    init = tf.compat.v1.global_variables_initializer()
 
     sess.run(init)
 
     # Load weights
-    loader = tf.train.Saver(var_list=restore_var)
+    loader = tf.compat.v1.train.Saver(var_list=restore_var)
     load(loader, sess, args.model_weights)
 
     # create output folder/s if they dont exist yet

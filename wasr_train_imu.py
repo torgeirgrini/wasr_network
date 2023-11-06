@@ -138,7 +138,7 @@ def build_tensors_in_checkpoint_file(loaded_tensors):
     for i, tensor_name in enumerate(loaded_tensors[0]):
         # Extract tensor
         try:
-            tensor_aux = tf.get_default_graph().get_tensor_by_name(tensor_name+":0")
+            tensor_aux = tf.compat.v1.get_default_graph().get_tensor_by_name(tensor_name+":0")
         except:
             print('Not found: '+tensor_name)
         else: # modification
@@ -188,9 +188,9 @@ def focal_loss_cost(labels, logits, gamma=2.0, alpha=4.0):
 
     # Compute focal loss for each label
     # Focal loss equation: -1 * (1 - softmax_logits)**gamma * log(softmax_logits)
-    fl_ce_o = -1. * mask_o * tf.log(softmax_logits[:,0]) * (1. - softmax_logits[:,0]) ** gamma  # Focal loss for obstacle pixels
-    fl_ce_w = -1. * mask_w * tf.log(softmax_logits[:,1]) * (1. - softmax_logits[:,1]) ** gamma  # Focal loss for water pixels
-    fl_ce_s = -1. * mask_s * tf.log(softmax_logits[:,2]) * (1. - softmax_logits[:,2]) ** gamma  # Focal loss for sky pixels
+    fl_ce_o = -1. * mask_o * tf.math.log(softmax_logits[:,0]) * (1. - softmax_logits[:,0]) ** gamma  # Focal loss for obstacle pixels
+    fl_ce_w = -1. * mask_w * tf.math.log(softmax_logits[:,1]) * (1. - softmax_logits[:,1]) ** gamma  # Focal loss for water pixels
+    fl_ce_s = -1. * mask_s * tf.math.log(softmax_logits[:,2]) * (1. - softmax_logits[:,2]) ** gamma  # Focal loss for sky pixels
 
     # Reduce sum of Focal Loss (add together all focal losses)
     fl_ce = fl_ce_o + fl_ce_w + fl_ce_s
@@ -205,7 +205,7 @@ def cost_function_separate_water_obstacle(features_output, gt_mask):
     # Get the shape of extracted features
     features_shape = features_output.get_shape()
     # Resize gt mask to match the extracted features shape (x,y)
-    gt_mask = tf.image.resize_images(gt_mask, size=features_shape[1:3],
+    gt_mask = tf.image.resize(gt_mask, size=features_shape[1:3],
                                      method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
     # Create water mask. Extract only pixels belonging to the water component
@@ -230,10 +230,10 @@ def cost_function_separate_water_obstacle(features_output, gt_mask):
     # Get rid of special cases
     # If there are zero obstacle pixels in an image, then set the number of total obstacle pixels in this image to one for numerical stability
     # otherwise dont change the number of total water pixels in an image
-    elements_obstacles = tf.where(tf.equal(elements_obstacles, 0), tf.ones_like(elements_obstacles), elements_obstacles)
+    elements_obstacles = tf.compat.v1.where(tf.equal(elements_obstacles, 0), tf.ones_like(elements_obstacles), elements_obstacles)
     # If there are zero water pixels in an image, then set the number of total water pixels in this image to one for numerical stability,
     # otherwise dont change the number of total water pixels in an image
-    elements_water = tf.where(tf.equal(elements_water, 0), tf.ones_like(elements_water), elements_water)
+    elements_water = tf.compat.v1.where(tf.equal(elements_water, 0), tf.ones_like(elements_water), elements_water)
 
     # Extract from the extracted features output only pixels belonging to the water component (by multiplying it with a water mask)
     # Values of pixels that do not belong to the water component will be set to 0
@@ -244,7 +244,7 @@ def cost_function_separate_water_obstacle(features_output, gt_mask):
 
     # Calculate the mean value of water pixels (return [n x num_features matrix] of mean values, where n is batch number)
     mean_water = tf.reduce_mean(tf.divide(tf.reduce_sum(water_pixels, axis=[1, 2]),
-                                          elements_water), axis=0, keep_dims=True)  # Calculate the averge water value across all images in a batch
+                                          elements_water), axis=0, keepdims=True)  # Calculate the averge water value across all images in a batch
 
     # Create mean water matrix where only pixels belonging to the water have mean values, other pixels are set to 0
     # The bellow two lines create a matrix of a size [batch_number, 1, 1, features_number],
@@ -260,15 +260,15 @@ def cost_function_separate_water_obstacle(features_output, gt_mask):
 
     # Calculate the variance of water pixels
     # Sum of squared differences between water elements and their mean values, divided by the number of all water elements
-    var_water = tf.divide(tf.reduce_sum(tf.squared_difference(water_pixels, mean_water_matrix_wat), axis=[1, 2]),
+    var_water = tf.divide(tf.reduce_sum(tf.math.squared_difference(water_pixels, mean_water_matrix_wat), axis=[1, 2]),
                           elements_water)
 
     # Reduce the mean of water variance (This computes mean variance for each image element across all images in a batch)
-    var_water = tf.reduce_mean(var_water, axis=0, keep_dims=True)
+    var_water = tf.reduce_mean(var_water, axis=0, keepdims=True)
 
     # Calculate squared difference between obstacle pixels and mean water values for each pixel and reduce sum in x,y
     # We get a matrix of size [batch_number, features_number]
-    difference_obs_wat = tf.reduce_sum(tf.squared_difference(obstacle_pixels, mean_water_matrix_obs), axis=[1, 2])
+    difference_obs_wat = tf.reduce_sum(tf.math.squared_difference(obstacle_pixels, mean_water_matrix_obs), axis=[1, 2])
 
     # Compute the separation
     loss_c = tf.divide(var_water + epsilon_watercost,
@@ -290,13 +290,13 @@ def main():
     input_size = (h, w)
 
     # Set random seed for reproducibility of the results
-    tf.set_random_seed(args.random_seed)
+    tf.compat.v1.set_random_seed(args.random_seed)
 
     # Create queue coordinator.
     coord = tf.train.Coordinator()
 
     # Load reader.
-    with tf.name_scope("create_inputs"):
+    with tf.compat.v1.name_scope("create_inputs"):
         reader = ImageReader(
             args.data_dir,
             args.data_list,
@@ -309,7 +309,7 @@ def main():
         image_batch, label_batch, imu_batch = reader.dequeue(args.batch_size)  # 1st = images, 2nd = gt labels, 3rd = imu (we do not need IMU here)
 
     # Create network.
-    with tf.variable_scope('', reuse=False):
+    with tf.compat.v1.variable_scope('', reuse=False):
         net = wasr_IMU_FU2({'data': image_batch, 'imu_data': imu_batch}, is_training=args.is_training, num_classes=args.num_classes)
 
     # For a small batch size, it is better to keep
@@ -328,13 +328,13 @@ def main():
 
     # Which variables to load. Running means and variances are not trainable,
     # thus all_variables() should be restored.
-    restore_var = [v for v in tf.global_variables() if 'fc' not in v.name or not args.not_restore_last]
+    restore_var = [v for v in tf.compat.v1.global_variables() if 'fc' not in v.name or not args.not_restore_last]
     #all_trainable = [v for v in tf.trainable_variables() if 'beta' not in v.name and 'gamma']  # all trainable variables
-    all_trainable = [v for v in tf.trainable_variables() if 'beta' not in v.name and 'gamma' not in v.name] #new all trainable
+    all_trainable = [v for v in tf.compat.v1.trainable_variables() if 'beta' not in v.name and 'gamma' not in v.name] #new all trainable
     fc_trainable = [v for v in all_trainable if 'fc' in v.name]    # only variables from the ASPP module
     arm_trainable = [v for v in all_trainable if 'arm_conv' in v.name]  # only variables from the ARM module
     ffm_trainable = [v for v in all_trainable if 'ffm_conv' in v.name]  # only variables from the FFM module
-    batch_trainable = [v for v in tf.trainable_variables() if 'beta' in v.name or 'gamma' in v.name] # for batchnorms
+    batch_trainable = [v for v in tf.compat.v1.trainable_variables() if 'beta' in v.name or 'gamma' in v.name] # for batchnorms
 
     conv_trainable = [v for v in all_trainable if 'fc' not in v.name and 'arm_conv' not in v.name and 'ffm_conv' not in v.name]  # lr * 1.0
     fc_w_trainable = [v for v in fc_trainable if 'weights' in v.name]  # lr * 10.0
@@ -356,7 +356,7 @@ def main():
 
     raw_gt = tf.reshape(label_proc, [-1,])
 
-    indices = tf.squeeze(tf.where(tf.less_equal(raw_gt, args.num_classes - 1)), 1)
+    indices = tf.squeeze(tf.compat.v1.where(tf.less_equal(raw_gt, args.num_classes - 1)), 1)
 
     gt = tf.cast(tf.gather(raw_gt, indices), tf.int32)
 
@@ -364,20 +364,20 @@ def main():
 
     # Features loss from somewhere in the middle. This forces the network to separate water pixels from obstacles
     loss_0 = cost_function_separate_water_obstacle(inthemiddle_output, label_batch)
-    loss_0 = tf.Print(loss_0, [loss_0], 'Water separation loss ')
+    loss_0 = tf.compat.v1.Print(loss_0, [loss_0], 'Water separation loss ')
 
     # Pixel-wise softmax cross entropy loss (This is the tensorflow implementation)
     #ce_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=prediction, labels=gt))
     #ce_loss = tf.Print(ce_loss, [ce_loss], 'Default TF crossentropy loss ')
 
     # Weight decay losses (l2 regularization)
-    l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'weights' in v.name]
+    l2_losses = [args.weight_decay * tf.nn.l2_loss(v) for v in tf.compat.v1.trainable_variables() if 'weights' in v.name]
     added_l2_losses = 10.e-2 * tf.add_n(l2_losses) # add together all l2 losses
-    added_l2_losses = tf.Print(added_l2_losses, [added_l2_losses], message="l2 losses ")
+    added_l2_losses = tf.compat.v1.Print(added_l2_losses, [added_l2_losses], message="l2 losses ")
 
     # Focal loss
     focal_loss = focal_loss_cost(labels=gt, logits=prediction)
-    focal_loss = tf.Print(focal_loss, [focal_loss], message="Focal loss ")
+    focal_loss = tf.compat.v1.Print(focal_loss, [focal_loss], message="Focal loss ")
 
     # Add together all of the losses (focal loss, weight decay and water-separation loss)
     reduced_loss = added_l2_losses + focal_loss + loss_0  #(10.e-2 * loss_0) # focal loss
@@ -385,16 +385,16 @@ def main():
 
     # Define loss and optimisation parameters.
     base_lr = tf.constant(args.learning_rate)
-    step_ph = tf.placeholder(dtype=tf.float32, shape=())
+    step_ph = tf.compat.v1.placeholder(dtype=tf.float32, shape=())
 
     # Learning rate modified based on the the current step
     learning_rate = tf.scalar_mul(base_lr, tf.pow((1 - step_ph / args.num_steps), args.power)) # version 1
     #learning_rate = tf.train.exponential_decay(base_lr, step_ph, 750, 0.7, staircase=True)    # version 2
 
     # RMSProp optimizer
-    opt_conv = tf.train.RMSPropOptimizer(learning_rate=learning_rate, decay=0.9, momentum=args.momentum, centered=True, name='RMSProp_conv')
-    opt_sp_w = tf.train.RMSPropOptimizer(learning_rate=learning_rate * 10, decay=0.9, momentum=args.momentum, centered=True, name='RMSProp_special_w')
-    opt_sp_b = tf.train.RMSPropOptimizer(learning_rate=learning_rate * 20, decay=0.9, momentum=args.momentum, centered=True, name='RMSProp_special_b')
+    opt_conv = tf.compat.v1.train.RMSPropOptimizer(learning_rate=learning_rate, decay=0.9, momentum=args.momentum, centered=True, name='RMSProp_conv')
+    opt_sp_w = tf.compat.v1.train.RMSPropOptimizer(learning_rate=learning_rate * 10, decay=0.9, momentum=args.momentum, centered=True, name='RMSProp_special_w')
+    opt_sp_b = tf.compat.v1.train.RMSPropOptimizer(learning_rate=learning_rate * 20, decay=0.9, momentum=args.momentum, centered=True, name='RMSProp_special_b')
 
     # Momentum optimizer (original)
     #opt_conv = tf.train.MomentumOptimizer(learning_rate, args.momentum)
@@ -409,15 +409,15 @@ def main():
     train_op = tf.group(op_c_all, op_spc_w, op_spc_b)
 
     # Set up tf session and initialize variables.
-    config = tf.ConfigProto()
+    config = tf.compat.v1.ConfigProto()
     config.gpu_options.allow_growth = True
-    sess = tf.Session(config=config)
-    init = tf.global_variables_initializer()
+    sess = tf.compat.v1.Session(config=config)
+    init = tf.compat.v1.global_variables_initializer()
 
     sess.run(init)
 
     # Saver for storing checkpoints of the model.
-    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=1)
+    saver = tf.compat.v1.train.Saver(var_list=tf.compat.v1.global_variables(), max_to_keep=1)
 
     # Load variables if the checkpoint is provided.
     #if args.restore_from is not None:
@@ -427,11 +427,11 @@ def main():
     # RESTORE PARTIAL WEIGHTS (which are available)
     restored_vars = get_tensors_in_checkpoint_file(file_name=args.restore_from, restore_last_bool=args.not_restore_last)
     tensors_to_load = build_tensors_in_checkpoint_file(restored_vars)
-    loader = tf.train.Saver(var_list=tensors_to_load)
+    loader = tf.compat.v1.train.Saver(var_list=tensors_to_load)
     loader.restore(sess, args.restore_from)
 
     # Start queue threads.
-    threads = tf.train.start_queue_runners(coord=coord, sess=sess)
+    threads = tf.compat.v1.train.start_queue_runners(coord=coord, sess=sess)
 
     # Iterate over training steps.
     for step in range(args.num_steps):

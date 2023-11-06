@@ -2,9 +2,12 @@ import numpy as np
 import tensorflow as tf
 import scipy.ndimage.filters as fi
 import copy
-slim = tf.contrib.slim
+# slim = tf.contrib.slim
+import tf_slim as slim
 #from tflearn.layers.conv import global_avg_pool
-from tensorflow.contrib.keras import layers as keras_ly
+# from tensorflow.contrib.keras import layers as keras_ly
+import keras.layers as keras_ly
+tf.compat.v1.disable_eager_execution()
 
 DEFAULT_PADDING = 'SAME'
 
@@ -46,7 +49,7 @@ class Network(object):
         # If true, the resulting variables are set as trainable
         self.trainable = trainable
         # Switch variable for dropout
-        self.use_dropout = tf.placeholder_with_default(tf.constant(1.0),
+        self.use_dropout = tf.compat.v1.placeholder_with_default(tf.constant(1.0),
                                                        shape=[],
                                                        name='use_dropout')
         self.setup(is_training, num_classes)
@@ -63,10 +66,10 @@ class Network(object):
         '''
         data_dict = np.load(data_path).item()
         for op_name in data_dict:
-            with tf.variable_scope(op_name, reuse=True):
+            with tf.compat.v1.variable_scope(op_name, reuse=True):
                 for param_name, data in data_dict[op_name].iteritems():
                     try:
-                        var = tf.get_variable(param_name)
+                        var = tf.compat.v1.get_variable(param_name)
                         session.run(var.assign(data))
                     except ValueError:
                         if not ignore_missing:
@@ -79,7 +82,7 @@ class Network(object):
         assert len(args) != 0
         self.terminals = []
         for fed_layer in args:
-            if isinstance(fed_layer, basestring):
+            if isinstance(fed_layer, str):
                 try:
                     #print('Layer ' + fed_layer + ' shape')
                     #print(self.layers[fed_layer].shape)
@@ -102,7 +105,7 @@ class Network(object):
 
     def make_var(self, name, shape):
         '''Creates a new TensorFlow variable.'''
-        return tf.get_variable(name, shape, trainable=self.trainable)
+        return tf.compat.v1.get_variable(name, np.array(shape).astype(int), trainable=self.trainable)
 
     def validate_padding(self, padding):
         '''Verifies that the padding is one of the supported ones.'''
@@ -110,7 +113,7 @@ class Network(object):
 
     @layer
     def attention_refinment_module(self, input, name):
-        global_pool = tf.reduce_mean(input, [1, 2], keep_dims=True)
+        global_pool = tf.reduce_mean(input, [1, 2], keepdims=True)
         #conv_1 = keras_ly.Conv2D(2048, [1, 1], padding='SAME', name=name+'_conv1')(global_pool)
         conv_1 = keras_ly.Conv2D(input.get_shape()[3], [1, 1], padding='SAME', name=name+'_conv1')(global_pool)
         sigmoid = tf.sigmoid(conv_1, name=name+'_sigmoid')
@@ -120,15 +123,15 @@ class Network(object):
 
     @layer
     def attention_refinment_module_new(self, input, name, last_arm=False):
-        global_pool = tf.reduce_mean(input, [1, 2], keep_dims=True)
+        global_pool = tf.reduce_mean(input, [1, 2], keepdims=True)
         conv_1 = keras_ly.Conv2D(input.get_shape()[3], [1, 1], padding='SAME', name=name+'_conv1')(global_pool)
-        with tf.variable_scope(name+'_conv1_bn') as scope:
+        with tf.compat.v1.variable_scope(name+'_conv1_bn') as scope:
             conv_1_bn = slim.batch_norm(conv_1, fused=True, scope=scope)
         sigmoid = tf.sigmoid(conv_1_bn, name=name+'_sigmoid')
         mul_out = tf.multiply(input, sigmoid, name=name+'_multiply')
 
         if last_arm:
-            glob_red = tf.reduce_mean(mul_out, [1, 2], keep_dims=True)
+            glob_red = tf.reduce_mean(mul_out, [1, 2], keepdims=True)
             out_scale = tf.multiply(glob_red, mul_out)
             print('last arm shape')
             print(input.shape)
@@ -147,7 +150,7 @@ class Network(object):
         concat_1 = tf.concat(axis=3, values=[input_big, up_sampled_input], name=name+'_concat')
         conv_1 = keras_ly.Conv2D(1024, [3, 3], padding='SAME', name=name+'_conv1')(concat_1)
 
-        global_pool = tf.reduce_mean(conv_1, [1, 2], keep_dims=True)
+        global_pool = tf.reduce_mean(conv_1, [1, 2], keepdims=True)
         conv_2 = keras_ly.Conv2D(1024, [1, 1], padding='SAME', name=name+'_conv2')(global_pool)
         conv_3 = keras_ly.Conv2D(1024, [1, 1], padding='SAME', name=name+'_conv3')(conv_2)
         sigmoid = tf.sigmoid(conv_3, name=name+'_sigmoid')
@@ -164,8 +167,8 @@ class Network(object):
 
         b_shape = input_big.get_shape()
         s_shape = input_small.get_shape()
-
-        if(b_shape[1].value > s_shape[1].value):
+        # if(b_shape[1].value > s_shape[1].value):
+        if(b_shape[1] > s_shape[1]):
             up_sampled_input = keras_ly.UpSampling2D(size=(2, 2), name=name+'_upsample')(input_small)
         else:
             up_sampled_input = input_small
@@ -174,7 +177,7 @@ class Network(object):
         conv_1 = keras_ly.Conv2D(num_features, [3, 3], padding='SAME', name=name+'_conv1')(concat_1)
         conv_1_bn_relu = tf.nn.relu(slim.batch_norm(conv_1, fused=True))
 
-        global_pool = tf.reduce_mean(conv_1_bn_relu, [1, 2], keep_dims=True)
+        global_pool = tf.reduce_mean(conv_1_bn_relu, [1, 2], keepdims=True)
 
         conv_2 = keras_ly.Conv2D(num_features, [1, 1], padding='SAME', name=name+'_conv2')(global_pool)
         conv_3 = keras_ly.Conv2D(num_features, [1, 1], padding='SAME', name=name+'_conv3')(conv_2)
@@ -194,7 +197,7 @@ class Network(object):
 
     @layer
     def global_pool(self, input, name, axis):
-        return tf.reduce_mean(input, axis=axis, keep_dims=True, name=name)
+        return tf.reduce_mean(input, axis=axis, keepdims=True, name=name)
 
 
     @layer
@@ -219,8 +222,8 @@ class Network(object):
         assert c_i % group == 0
         assert c_o % group == 0
         # Convolution for a given input and kernel
-        convolve = lambda i, k: tf.nn.conv2d(i, k, [1, s_h, s_w, 1], padding=padding)
-        with tf.variable_scope(name) as scope:
+        convolve = lambda i, k: tf.nn.conv2d(i, filters=k, strides=[1, s_h, s_w, 1], padding=padding)
+        with tf.compat.v1.variable_scope(name) as scope:
             kernel = self.make_var('weights', shape=[k_h, k_w, c_i / group, c_o])
             if group == 1:
                 # This is the common-case. Convolve the input without any further complications.
@@ -262,7 +265,7 @@ class Network(object):
         assert c_o % group == 0
         # Convolution for a given input and kernel
         convolve = lambda i, k: tf.nn.atrous_conv2d(i, k, dilation, padding=padding)
-        with tf.variable_scope(name) as scope:
+        with tf.compat.v1.variable_scope(name) as scope:
             kernel = self.make_var('weights', shape=[k_h, k_w, c_i / group, c_o])
             if group == 1:
                 # This is the common-case. Convolve the input without any further complications.
@@ -289,12 +292,12 @@ class Network(object):
 
     @layer
     def resize_img(self, input, size_x, size_y, name):
-        return tf.cast(tf.image.resize_nearest_neighbor(input, size=(size_y, size_x), name=name), dtype=tf.float32)
+        return tf.cast(tf.image.resize(input, size=(size_y, size_x), name=name, method=tf.image.ResizeMethod.NEAREST_NEIGHBOR), dtype=tf.float32)
 
     @layer
     def max_pool(self, input, k_h, k_w, s_h, s_w, name, padding=DEFAULT_PADDING):
         self.validate_padding(padding)
-        return tf.nn.max_pool(input,
+        return tf.nn.max_pool2d(input=input,
                               ksize=[1, k_h, k_w, 1],
                               strides=[1, s_h, s_w, 1],
                               padding=padding,
@@ -308,7 +311,7 @@ class Network(object):
     @layer
     def avg_pool(self, input, k_h, k_w, s_h, s_w, name, padding=DEFAULT_PADDING):
         self.validate_padding(padding)
-        return tf.nn.avg_pool(input,
+        return tf.nn.avg_pool2d(input=input,
                               ksize=[1, k_h, k_w, 1],
                               strides=[1, s_h, s_w, 1],
                               padding=padding,
@@ -335,7 +338,7 @@ class Network(object):
 
     @layer
     def fc(self, input, num_out, name, relu=True):
-        with tf.variable_scope(name) as scope:
+        with tf.compat.v1.variable_scope(name) as scope:
             input_shape = input.get_shape()
             if input_shape.ndims == 4:
                 # The input is spatial. Vectorize it first.
@@ -347,7 +350,7 @@ class Network(object):
                 feed_in, dim = (input, input_shape[-1].value)
             weights = self.make_var('weights', shape=[dim, num_out])
             biases = self.make_var('biases', [num_out])
-            op = tf.nn.relu_layer if relu else tf.nn.xw_plus_b
+            op = tf.compat.v1.nn.relu_layer if relu else tf.compat.v1.nn.xw_plus_b
             fc = op(feed_in, weights, biases, name=scope.name)
             return fc
 
@@ -359,14 +362,14 @@ class Network(object):
             # need to be explicitly squeezed, since they're not broadcast-able
             # in TensorFlow's NHWC ordering (unlike Caffe's NCHW).
             if input_shape[1] == 1 and input_shape[2] == 1:
-                input = tf.squeeze(input, squeeze_dims=[1, 2])
+                input = tf.squeeze(input, axis=[1, 2])
             else:
                 raise ValueError('Rank 2 tensor input expected for softmax!')
         return tf.nn.softmax(input, name)
         
     @layer
     def batch_normalization(self, input, name, is_training, activation_fn=None, scale=True):
-        with tf.variable_scope(name) as scope:
+        with tf.compat.v1.variable_scope(name) as scope:
             output = slim.batch_norm(
                 input,
                 activation_fn=activation_fn,
@@ -379,11 +382,11 @@ class Network(object):
     @layer
     def dropout(self, input, keep_prob, name):
         keep = 1 - self.use_dropout + (self.use_dropout * keep_prob)
-        return tf.nn.dropout(input, keep, name=name)
+        return tf.nn.dropout(input, rate=1 - (keep), name=name)
 
     def se_fully_connected(self, input, units=3, name='sen_fullyconnected'):
         #with tf.name_scope(name):
-        return tf.layers.dense(inputs=input, use_bias=True, units=units)
+        return tf.compat.v1.layers.dense(inputs=input, use_bias=True, units=units)
 
     def se_relu(self, input):
         return tf.nn.relu(input)
@@ -393,7 +396,7 @@ class Network(object):
         return tf.nn.sigmoid(input, name=name)
 
     def se_fc(self, input, num_out, name, relu=True):
-        with tf.variable_scope(name) as scope:
+        with tf.compat.v1.variable_scope(name) as scope:
             input_shape = input.get_shape()
             if input_shape.ndims == 4:
                 # The input is spatial. Vectorize it first.
@@ -405,10 +408,10 @@ class Network(object):
                 feed_in, dim = (input, input_shape[-1].value)
             weights = self.make_var('weights', shape=[dim, num_out])
             biases = self.make_var('biases', [num_out])
-            op = tf.nn.relu_layer if relu else tf.nn.xw_plus_b
+            op = tf.compat.v1.nn.relu_layer if relu else tf.compat.v1.nn.xw_plus_b
             fc = op(feed_in, weights, biases, name=scope.name)
             return fc
 			
     @layer
     def global_pool_layer(self, input, axis, name, keep_dims):
-        return tf.reduce_mean(input, axis, keep_dims=keep_dims, name=name)
+        return tf.reduce_mean(input, axis, keepdims=keep_dims, name=name)
